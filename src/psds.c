@@ -7,14 +7,17 @@
 /*  DEFAULT HYPERPARAMETER VALUES                                                                                    */
 /*                                                                                                                   */
 #define  INPUT_LAYER_CNT     (28*28)+1    /* +1 is for bias unit, the highest numbered element                       */
-#define  HIDDEN0_LAYER_CNT   83+1         /* +1 is for bias unit (highest numbered element)                          */
+#define  HIDDEN0_LAYER_CNT   204+1        /* +1 is for bias unit (highest numbered element)                          */
+                                          /* Best values (?): 205, 184, 177, 170, 84                                 */
 #define  OUTPUT_LAYER_CNT    10           /* since nothing follows output layer, no extra bias unit                  */
                                           /*                                                                         */
 #define  RELOAD_WEIGHTS      0            /*  1: use weights previously saved to loadWeights.c (requires recompile)  */
 #define  MAX_HP_SWEEPS       1            /*  Max number of hyperparameter sweeps. 1: normal run (no sweep)          */
-#define  MAX_EPOCHS          4            /*  1 ...                                                                  */
-#define  LEARNING_RATE       0.10         /*  (eta) -- initial learning rate                                         */
+#define  MAX_EPOCHS          6            /*  1 ...                                                                  */
+#define  LEARNING_RATE       0.19000000   /*  (eta) -- initial learning rate. Reasonable value: 0.150                */
 #define  MOMENTUM            0.10         /*  (alpha) -- momentum coefficient                                        */
+#define  REGULARIZE_TYPE     REG_L2       /*  What kind, if any, regularization to use to calculate output error     */
+#define  K_REGULARIZE        0.000000     /*  (lambda) -- L2 norm regularizaton coefficient                          */
 #define  STOP_VALID_SCORE    1.9340000    /*  Stop of validation score reaches this value (and early stop enabled)   */
 #define  TRAIN_SUBSET_SIZE   (42000/4)*4  /*  No. images to be used in TRAINING the net   [29400 = 42K * 0.7]        */
 #define  VALID_SUBSET_SIZE   (42000/4)*4  /*  No. images to be used in VALIDATING the net [12600 = 42K * 0.3]        */
@@ -22,8 +25,8 @@
 #define  UPDATE_RULE_TYPE    UR_ONLINE    /*  see psds.h for a list of defined values                                */
 #define  MINIBATCH_SIZE      100          /*  For minibatch updates: number of training cases per weight update      */
 #define  NOISE               0.00         /*  Amount of noise to add to image for 2nd pass; 0.0 = disable            */
-#define  REGULARIZATION      REG_NONE     /*  What kind, if any, regularization to use to calculate output error     */
-#define  WEIGHT_DECAY        0.00001      /*  Weight decay per epoch; 0.00 = no weight decay. Try 0.00001 or lower   */
+#define  WEIGHT_DECAY        0.00000      /*  Weight decay per epoch; 0.00 = no weight decay. Try 0.00001 or lower   */
+#define  RANDOM_WT_SCALE     0.1960       /*  Used for scaling random numbers used to initialize weights             */
 /*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - */
 #define  DEBUG_LEVEL         1            /*  0: no debug; 1: basic; 2: verbose                                      */
 #define  PROCESS_PRIO        19           /*  Priority of this processs; -20=hoggiest ... 19=nicest :)               */
@@ -31,15 +34,25 @@
 #define  FB_IMP              FBI_JB       /*  FBI_DEFAULT, FBI_SAS, FBI_JB, FBI_MM, ...                              */
 #define  BACKPROP_DEV_MODE   0            /*  1: force small dataset for development (essentially a unit test)       */
 #define  RUN_DWN_GRAD_LMT    1            /*                                                                         */
-#define  WEIGHT_TWEAK        0.0001       /*  0.0001 is a reasonable value                                           */
+#define  WEIGHT_TWEAK        0.00001      /*  0.0001 is a reasonable value                                           */
                                           /*                                                                         */
 /* FILE PATHS                                                                                                        */
-#define  TRAIN_FILE_PATH     "../dataset/train.csv"    /*  train.csv  or  train_100.csv                              */
-#define  TEST_FILE_PATH      "../dataset/test.csv"     /*  test.csv  or  test_100.csv                                */
-#define  HPSWEEP_GRAPH_PATH  "../graphs/hpSweep.html"  /*                                                            */
-                                                       /*                                                            */
+#define  TRAIN_FILE_PATH     "../dataset/train.csv"       /*  path to training data CSV file                         */
+#define  TEST_FILE_PATH      "../dataset/test.csv"        /*  path to test data CSV file                             */
+#define  TRAIN_GRAPH_PATH    "../graphs/training.html"    /*                                                         */
+#define  VALID_GRAPH_PATH    "../graphs/validation.html"  /*                                                         */
+#define  HPSWEEP_GRAPH_PATH  "../graphs/hpSweep.html"     /*                                                         */
+                                                          /*                                                         */
 /*-------------------------------------------------------------------------------------------------------------------*/
 /* REVISION HISTORY                                                                                                  */
+/*                                                                                                                   */
+/* 05 APR 2017  SAS. Achieved my new goal of >= 96%: got 96.914% today. 6 epochs rather than 4 as in most previous   */
+/*              submissions; fine tuned random weight initialization. THE BEST PART is, I finally beat the two       */
+/*              benchmarks: "Random forest" at 96.829%, and "KNN, K=10" at 96.557%.  :-)                             */
+/*              I had not previously submitted anything past epoch 4 because I had more of an issue with overfitting */
+/*              before. Eithe rthis belief was a mistake, or something else changed.                                 */
+/*                                                                                                                   */
+/* 04 APR 2017  SAS. Achieved my goal of >= 95% Kaggle score (95.714%), but now I want to see if I can go higher...  */
 /*                                                                                                                   */
 /* 01 APR 2017  SAS. FINALLY got backprop implemented and working. After 3 epochs lasting just 3m 51s, made a Kaggle */
 /*              digit recognition submission which scored 0.91329. The previous score of 0.88729 took almost a full  */
@@ -111,23 +124,22 @@
 /* (3rd son) Tzu                                                                                                     */
 /* "I am not going to fight that battle, but if YOU want to, go right ahead -- god forbid I contradict you!"         */
 /*   -- ppb, 29 March 2017, 9:05 pm, after I chastised spud for coming back downstars 20 minutes past his            */
-/*      bedtime, and she had casually emgaged with and chatted with him.                                             */
+/*      bedtime, and she had casually engaged with and chatted with him.                                             */
 /*-------------------------------------------------------------------------------------------------------------------*/
 /* TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO   TODO     */
 /*                                                                                                                   */
+/*  [ ] FIX L2 regularization of weight values                                                                       */
+/*                                                                                                                   */
+/*  [ ] Perform a hyperparam sweep of random weight init magnitudes.                                                 */
+/*  [ ] Perform a hyperparam sweep of srand() seed values                                                            */
+/*  [ ] Training error graph seems to be going the wrong way (should be converging to zero) -- investigate           */
 /*  [ ] Fix status information display, during training and test. Broken/messy/incomplete.                           */
 /*  [ ] Update submission html file generation                                                                       */
-/*  [ ] Perform a hyperparam sweep of random weight init magnitudes.                                                 */
+/*  [ ] Perform momentum sweep                                                                                       */
 /*  [ ] Look into using CUDAMat or other CUDA-enabled maxrix library to speed things up when available               */
-/*  [ ] Consider L2 or L1 regularization of weight values                                                            */
 /*  [ ] For the purposes of graphing, validation and training error must be calculated with the same units; I also   */
 /*      need a 3rd metric, which is accuracy. Generate that 3rd graph (or combine all 3 into one graph?), or...?     */
 /*       ==> https://en.wikipedia.org/wiki/Cross-validation_(statistics)                                             */
-/*  [ ] During generation of submission file, add manual substitution functionality whereby values in a CSV file     */
-/*      (which are manually produced) are used to replace corresponding values in the submission file.               */
-/*  [ ] Restructure and modularize the main loop, separating (at a minimum) validation and test                      */
-/*      into functions so as to allow their use in various combinations. This will facilitate minibatches,           */
-/*      selective generation of weight files, mini batches, etc.                                                     */
 /*  [ ] Implement mini batches [ref 3]                                                                               */
 /*  [ ] In the graph html, place text well below the canvas which details the hyperparameters, epoch, ...            */
 /*  [ ] Add some forgiveness to early stopping, such that it tries modifying tweek values etc. before giving up      */
@@ -144,6 +156,11 @@
 /*      could include confidence values for each classification                                                      */
 /*  [ ] Implement dropout (or DropConnect, or...)     https://en.wikipedia.org/wiki/Dropout_(neural_networks)        */
 /*  [ ] Consider switching to ReLU rather than sigmoid activation                                                    */
+/*  [X] Perform sweep of # of hidden0 units                                                                          */
+/*  [X] Perform learning rate sweep                                                                                  */
+/*  [X] Restructure and modularize the main loop, separating (at a minimum) validation and test                      */
+/*      into functions so as to allow their use in various combinations. This will facilitate minibatches,           */
+/*      selective generation of weight files, mini batches, etc.                                                     */
 /*  [X] Implement k-fold cross-validation                                                                            */
 /*  [X] Make the number of hidden layers dynamically configurable. This will allow the automated                     */
 /*      search for optimum hyperparameters.                                                                          */
@@ -187,11 +204,6 @@
 /*                                                                                                                   */
 /*-------------------------------------------------------------------------------------------------------------------*/
 /* MISCELLANEOUS                                                                                                     */
-/*                                                                                                                   */
-/* http://www.alluc.ee/l/A-Monster-Calls-2016-1080p-WEB-DL-x264-AC3-JYK-rar/pxpus1rm                                 */
-/*                                                                                                                   */
-/* Lowering priority on running process (which default to niceness of 12)                                            */
-/*   renice -n 19 -p <process_id>                                                                                    */
 /*                                                                                                                   */
 /* This wikipedia article [https://en.wikipedia.org/wiki/MNIST_database] describes using 2 layer neural nets to      */
 /* classify handwritten digits in the MNIST database. They were both configured 784-800-10 (800 hidden units!)       */
@@ -259,9 +271,9 @@
 #define  TRAIN_FILE_SIZE         42000
 #define  TEST_FILE_SIZE          28000
 #define  MAX_LINE_SIZE           10000  /* training file line buffer size */
-#define  MAX_INPUT_LAYER_CNT     1000
+#define  MAX_INPUT_LAYER_CNT     (28*28)+1
 #define  MAX_HIDDEN0_LAYER_CNT   1000
-#define  MAX_OUTPUT_LAYER_CNT    1000
+#define  MAX_OUTPUT_LAYER_CNT    10
 
 #if( BACKPROP_DEV_MODE )
   /* For use with  https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/  */
@@ -297,8 +309,10 @@ typedef struct _hyperparam_t
   int        updateRuleType;              /*  see psds.h for a list of defined values                                */
   int        minibatchSize;               /*  For minibatch updates: number of training cases per weight update      */
   double     noise;                       /*  Amount of noise to add to image for 2nd pass; 0.0 = disable            */
-  int        regularization;              /*  What kind, if any, regularization to use to calculate output error     */
+  int        regularizeType;              /*  What kind, if any, regularization to use to calculate output error     */
   double     weightDecay;                 /*  Weight decay per epoch; 0.00 = no weight decay. Try 0.00001 or lower   */
+  double     kRegularize;                 /*  (lambda) -- regularization coefficient                                 */
+  double     randomWtScale;               /*  Used for scaling random values loaded into each weight at init time    */
 } hyperparam_t;
 
 
@@ -316,7 +330,7 @@ typedef struct _net_t
   int    state;                             /* 0: training; 1: validation; 2: test */
 
   /* INPUT LAYER */
-  double X[MAX_INPUT_LAYER_CNT];                /* Matrix of input layer values */
+  double X[MAX_INPUT_LAYER_CNT];            /* Matrix of input layer values */
   int    label;                             /* Current training label */
 #if( FB_IMP == FBI_SAS )
   int    specialFordwardUpdate[2];
@@ -350,7 +364,6 @@ typedef struct _net_t
 #endif
 } net_t;
 
-
 typedef struct _imageData_t
 {
   double  trainImg[TRAIN_FILE_SIZE][28*28];
@@ -369,6 +382,35 @@ void backward( net_t *net );
 
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
+double computeL2norm( net_t * net )
+{
+  int i, j;
+  double L2 = 0.0;
+
+  /* Calculate L2 norm (magnitude of weights as a single vector) */
+  for( i=0; i<net->hyperparams.hidden0LayerCnt-1; i++ )
+  {
+    for( j=0; j<net->hyperparams.inputLayerCnt; j++ )
+    {
+      L2 += net->W1[i][j] * net->W1[i][j];
+    }
+  }
+  for( i=0; i<net->hyperparams.outputLayerCnt; i++ )
+  {
+    for( j=0; j<net->hyperparams.hidden0LayerCnt-1; j++ )
+    {
+      L2 += net->W2[i][j] * net->W2[i][j];
+    }
+  }
+  L2 = sqrt( L2 );
+#if( 0 )
+  printf( "L2norm:%.6lf  ", L2 );
+#endif
+  return L2;
+}
+
+/*********************************************************************************************************************/
+/*********************************************************************************************************************/
 int loadHyperparmsFromFile( hyperparam_t *p )
 {
 }
@@ -378,7 +420,14 @@ int loadHyperparmsFromFile( hyperparam_t *p )
 /*********************************************************************************************************************/
 double randomWeight( void )
 {
-  return -1.0 + ( ( (double)rand() ) / ( (double)( RAND_MAX/2 ) ) );
+  double r;
+
+  r = (double)rand();     /* set r = 0...RAND_MAX */
+  r /= (double)RAND_MAX;  /* set r = 0...1 */
+  r *= 2.0;               /* set r = 0...2 */
+  r -= 1.0;               /* set r = -1 ... +1 */
+
+  return r;
 }
 
 /*********************************************************************************************************************/
@@ -596,7 +645,7 @@ void dumpNetToHTML( net_t *net, char mode[] )
 /*********************************************************************************************************************/
 void dumpInputLayerToHTML( hyperparam_t *hp, int label, double v[], char mode[] )
 {
-  int i, j, k;
+  int i, j, c;
   FILE *f = fopen( "X.html", mode );
   if( f )
   {
@@ -604,15 +653,17 @@ void dumpInputLayerToHTML( hyperparam_t *hp, int label, double v[], char mode[] 
                 "<TR><TD WIDTH=20>&nbsp;%d</TD><TD>", label );
     fprintf( f, "<TABLE CELLSPACING=0 BORDER=0><TR>\n" );
     j = 0;
-    for( i=0; i<hp->inputLayerCnt; i++ )
+    for( i=0; i<hp->inputLayerCnt-1; i++ )
     {
-#if( 1 )
+      c = (int)(v[i] * 255.0);
+#if( 0 )
       /* RED */
-      int color = 0xFFFFFF - (((int)v[i])<<8) - ((int)v[i]);
+/*      int color = 0xFFFFFF - (((int)v[i])<<8) - ((int)v[i]); */
+      int color = 0xFFFFFF - ( c<<8) - c;
       fprintf( f, "<TD HEIGHT=3 WIDTH=1 BGCOLOR=%06x>", color );
 #else
       /* BLACK */
-      int color = 0xFFFFFF - ((int)v[i] | ((int)v[i])<<8 | ((int)v[i]) << 16);
+      int color = 0xFFFFFF - (c | (c<<8) | (c<<16));
       fprintf( f, "<TD HEIGHT=3 WIDTH=1 BGCOLOR=%06x>", v[i] > 0.0 ? color : 0xF0F0F0 );
 #endif
       if( ++j > 27 )
@@ -653,7 +704,11 @@ void initNet( net_t *net )
   {
     for( j=0; j<net->hyperparams.inputLayerCnt; j++ )
     {
+#if( 0 )
       net->W1[i][j] = randomWeight() / sqrt( (double)net->hyperparams.inputLayerCnt );
+#else
+      net->W1[i][j] = randomWeight() * net->hyperparams.randomWtScale;
+#endif
       net->W1delta[i][j] = 0.0;
     }
   }
@@ -663,7 +718,11 @@ void initNet( net_t *net )
   {
     for( j=0; j<net->hyperparams.hidden0LayerCnt; j++ )
     {
+#if( 0 )
       net->W2[i][j] = randomWeight() / sqrt( (double)net->hyperparams.hidden0LayerCnt );
+#else
+      net->W2[i][j] = randomWeight() * net->hyperparams.randomWtScale;
+#endif
       net->W2delta[i][j] = 0.0;
     }
   }
@@ -1001,7 +1060,7 @@ void forward( net_t *net )
 void forward( net_t *net )
 {
   int    i, j, k;
-  double d;
+  double d, L2norm = 0.0; /* computeL2norm( net ); foobar */
 
   /* Calculate hidden layer activations */
   for( i=0; i<net->hyperparams.hidden0LayerCnt-1; i++ )  /* -1, as bias unit by definition has fixed activation (1.0) */
@@ -1035,12 +1094,20 @@ void forward( net_t *net )
                    * net->Yhat[i] * ( 1.0 - net->Yhat[i] ); /* Sigmoidal Outputs, SSE */
 
     /* Cost function: = 1/2 * (desired - actual)^^2  */
-    net->outputLayerErrors[i] = 0.5 * ( net->Y[i] - net->Yhat[i] )
-                                    * ( net->Y[i] - net->Yhat[i] );
+#if( 0 )
+    net->outputLayerErrors[i] = 0.5 *
+                                  (
+                                    ( ( net->Y[i] - net->Yhat[i] ) * ( net->Y[i] - net->Yhat[i] ) )
+                                    + ( net->hyperparams.kRegularize * L2norm )
+                                  );
+#else
+    net->outputLayerErrors[i] = 0.5 * ( net->Y[i] - net->Yhat[i] ) * ( net->Y[i] - net->Yhat[i] );
+#endif
     net->outputErrorTotal += net->outputLayerErrors[i];
   }
 #if( DEBUG_LEVEL > 1 )
-  printf( "forward(); net->a2[net->hyperparams.hidden0LayerCnt-1] = %.3lf\n", net->a2[net->hyperparams.hidden0LayerCnt-1] );
+  printf( "forward(); net->a2[net->hyperparams.hidden0LayerCnt-1] = %.3lf\n",
+          net->a2[net->hyperparams.hidden0LayerCnt-1] );
   fflush( stdout );
 #endif
 }
@@ -1571,8 +1638,8 @@ void  testAndGenerateSubmissionFile( net_t *net, imageData_t *imageData )
 
   fprintf( outputFile, "<TR><TD COLSPAN=2 ALIGN=CENTER><B>Hyperparameters & config</B></TD></TR>\n" );
 
-  fprintf( outputFile, "<TR><TD ALIGN=RIGHT>Hidden layer 0 count</TD>"
-                           "<TD ALIGN=CENTER>%d</TD></TR>\n",    net->hyperparams.hidden0LayerCnt );
+  fprintf( outputFile, "<TR><TD ALIGN=RIGHT WIDTH=500>Hidden layer 0 count</TD>"
+                           "<TD ALIGN=CENTER WIDTH=400>%d</TD></TR>\n",    net->hyperparams.hidden0LayerCnt );
 
   fprintf( outputFile, "<TR><TD ALIGN=RIGHT>Max hyperparameter sweeps</TD>"
                            "<TD ALIGN=CENTER>%d</TD></TR>\n",    net->hyperparams.maxHpSweeps );
@@ -1610,6 +1677,9 @@ void  testAndGenerateSubmissionFile( net_t *net, imageData_t *imageData )
 
   fprintf( outputFile, "<TR><TD ALIGN=RIGHT>Noise</TD>"
                            "<TD ALIGN=CENTER>%.4lf</TD></TR>\n",    net->hyperparams.noise );
+
+  fprintf( outputFile, "<TR><TD ALIGN=RIGHT>Weight decay</TD>"
+                           "<TD ALIGN=CENTER>%.8lf</TD></TR>\n",    net->hyperparams.weightDecay );
   fprintf( outputFile, "</TABLE\n" );
   fprintf( outputFile, "</HTML>\n" );
   fclose( outputFile );
@@ -1630,18 +1700,18 @@ cleanupAndExit:
 
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
-void addNoise( net_t *net, double dist )
+void addNoise( net_t *net )
 {
   int i;
   double r;
 
-  for( i=0; i<28*28; i++ )
+  for( i=0; i<net->hyperparams.inputLayerCnt-1; i++ )
   {
     r = (double)rand();     /* set r = 0...RAND_MAX */
     r /= (double)RAND_MAX;  /* set r = 0...1 */
     r *= 2.0;               /* set r = 0...2 */
-    r -= 1.0;                   /* set r = -1 ... +1 */
-    net->X[i] += r * dist;
+    r -= 1.0;               /* set r = -1 ... +1 */
+    net->X[i] += r * net->hyperparams.noise;
     if( net->X[i] <  0.0 ) net->X[i] = 0.0;
     if( net->X[i] >  1.0 ) net->X[i] = 1.0;
   }
@@ -1705,8 +1775,10 @@ void initHyperparamsFromDefaults( hyperparam_t *hp )
   hp->updateRuleType    = UPDATE_RULE_TYPE;
   hp->minibatchSize     = MINIBATCH_SIZE;
   hp->noise             = NOISE;
-  hp->regularization    = REGULARIZATION;
+  hp->regularizeType    = REGULARIZE_TYPE;
   hp->weightDecay       = WEIGHT_DECAY;
+  hp->kRegularize       = K_REGULARIZE;
+  hp->randomWtScale     = RANDOM_WT_SCALE;
 }
 
 /*********************************************************************************************************************/
@@ -1719,7 +1791,7 @@ int main( int argc, char *argv[] )
   int           currentTrainingLabel;
   net_t        *net = NULL;
   imageData_t  *imageData = NULL;
-  double        graphX[1000], trainingGraphY[1000], validationGraphY[1000];
+  double        trainGraphX[1000], trainGraphY[1000], validGraphX[1000], validGraphY[1000];
   double        bestValidationScore = 0.0;
   classInfo_t   classInfo;
   double        foo, bar;
@@ -1803,7 +1875,6 @@ int main( int argc, char *argv[] )
   printf( "All training and test image data loaded\n" );
 
   printf( "** training **\n" );
-  net->state = 0; /* Its training time! */
 
   /**------------------------------------------------------------------------------------------**/
   /** HYPERPARAMETER SWEEP LOOP  **  HYPERPARAMETER SWEEP LOOP  **  HYPERPARAMETER SWEEP LOOP  **/
@@ -1811,9 +1882,16 @@ int main( int argc, char *argv[] )
   hpSweep = 0;
   while( hpSweep < net->hyperparams.maxHpSweeps )
   {
+#if( 0 )
+srand( 10 );  /* Initialize pseudorandom number generator */
+#endif
+#if( 0 )
+srand( hpSweep );
+#endif
 #if( 1 )
   srand( 12345 );  /* Initialize pseudorandom number generator */
-#else
+#endif
+#if( 0 )
   srand((int)time(NULL));  /* Initialize pseudorandom number generator */
 #endif
 
@@ -1830,6 +1908,7 @@ int main( int argc, char *argv[] )
     /**  TRAINING LOOP  **  TRAINING LOOP  **  TRAINING LOOP  **  TRAINING LOOP  **/
     /**--------------------------------------------------------------------------**/
     id_idx = 0;
+    net->state = 0; /* Its training time! */
     while( epoch < net->hyperparams.maxEpochs )
     {
       /**------------**/
@@ -1856,9 +1935,9 @@ int main( int argc, char *argv[] )
           net->Y[i] = (i==net->label) ? 0.99 : 0.01;
 
         /* Optionally add some noise to the image data prior to learning */
-        if( NOISE > 0.0 )
+        if( net->hyperparams.noise > 0.0 )
         {
-          addNoise( net, NOISE );
+          addNoise( net );
         }
         /* Train the net with the current image */
         forward( net );
@@ -1869,9 +1948,13 @@ int main( int argc, char *argv[] )
           weightDecay( net, net->hyperparams.weightDecay );
       }
 
+      trainGraphY[epoch] = net->outputErrorTotal;
+      GRF_quickGraph( TRAIN_GRAPH_PATH, trainGraphX, trainGraphY, epoch, "red", 700, 320, 5000 );
+
       /**--------------**/
       /**  VALIDATION  **/
       /**--------------**/
+      net->state = 1; /* Its validation time! */
       d = 0.0; /* total output error */
       foo = bar = 0.0;
       fooCnt = barCnt = 0;
@@ -1928,9 +2011,9 @@ int main( int argc, char *argv[] )
 #if( 1 )
       printf( "avg conf of correct: %.3lf    of wrong: %.3lf\n", foo/(double)fooCnt, bar / (double)barCnt );
 #endif
-
-    dumpWeightsToSrcFile( net ); /* After one set of training data, store the weights */
-
+#if( 0 )
+      dumpWeightsToSrcFile( net ); /* After one set of training data, store the weights */
+#endif
 #if( 0 )
       /* Record the network error to our log file for external viewing */
       logToErrorCSVFile( epoch, net->outputErrorTotal, epoch ? "a" : "w" );
@@ -1942,24 +2025,22 @@ int main( int argc, char *argv[] )
       fflush( stdout );
 
 #if( 1 )
-      graphX[epoch] = (double)epoch;
+      validGraphX[epoch] = (double)epoch;
 #else
       graphX[epoch] = (clock() - start) / CLOCKS_PER_SEC;
 #endif
-      trainingGraphY[epoch] = net->outputErrorTotal;
-      validationGraphY[epoch] = d;
+      validGraphY[epoch] = d;
 
       epoch++;
 
-      GRF_quickGraph( "training.html",   graphX,   trainingGraphY, epoch, "red", 700, 320, 5000 );
-      GRF_quickGraph( "validation.html", graphX, validationGraphY, epoch, "red", 700, 320, 5000 );
+      GRF_quickGraph( VALID_GRAPH_PATH, validGraphX, validGraphY, epoch, "red", 700, 320, 5000 );
 
       /*---------------------------------------------------------------------------------------------------*/
       /* If k-fold cross-validation is enabled, we advance the image data index a user-specified distance, */
       /* so that the next epoch trains on a different set of data. If not enabled, just reset the index to */
       /* the beginning of the data set                                                                     */
       /*---------------------------------------------------------------------------------------------------*/
-#if( SKIP_SET_SIZE == 0 )
+#if( SKIP_SUBSET_SIZE == 0 )
       id_idx = 0;
 #else
       id_idx = (id_idx + net->hyperparams.skipSetSize )%TRAIN_FILE_SIZE;
@@ -1979,18 +2060,19 @@ int main( int argc, char *argv[] )
     {
       /* Log results of hyperparameter sweep */
 #if( 0 )
-      hpSweepGraphX[hpSweepGraphIdx] = hpSweepGraphIdx;
-#else
-      hpSweepGraphX[hpSweepGraphIdx] = net->hyperparams.hidden0LayerCnt;
+      hpSweepGraphX[hpSweepGraphIdx] = hpSweep-1;
+#endif
+#if( 1 )
+      hpSweepGraphX[hpSweepGraphIdx] = net->hyperparams.randomWtScale;
 #endif
       hpSweepGraphY[hpSweepGraphIdx] = bestValidationScore;
       hpSweepGraphIdx++;
-      GRF_quickGraph( HPSWEEP_GRAPH_PATH,   hpSweepGraphX,  hpSweepGraphY, hpSweepGraphIdx, "red", 700, 320, 5000 );
+      GRF_quickGraph( HPSWEEP_GRAPH_PATH,   hpSweepGraphX,  hpSweepGraphY, hpSweepGraphIdx, "blue", 700, 320, 5000 );
 
       /* HYPERPARAMETER SWEEP DECISION POINT                               */
       /* Decide if another hyperparameter speep is needed; if not, get out */
-      net->hyperparams.hidden0LayerCnt += 1;
-      if( net->hyperparams.hidden0LayerCnt > 250 )
+      net->hyperparams.randomWtScale  +=    0.005;
+      if( net->hyperparams.randomWtScale >  0.3500 )
       {
         hpSweep = net->hyperparams.maxHpSweeps; /* Time to leave */
       }
@@ -2002,7 +2084,7 @@ int main( int argc, char *argv[] )
   /**  TEST AND SUBMISSION GENERATION  **/
   /**----------------------------------**/
   printf( "\n** test & generate submission **\n" );
-  net->state = 0; /* Its test time! */
+  net->state = 2; /* Its test time! */
 
   testAndGenerateSubmissionFile( net, imageData );
 
@@ -2040,15 +2122,7 @@ cleanupAndExit:
 }
 
 
-
-
-
-
-
-
-
-
-
+/** EOF **/
 
 
 
